@@ -19,38 +19,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!token);
 
-  // User data query
-  const { data: user, isLoading, refetch } = useQuery({
-    queryKey: ['/api/user'],
+  // Modified user query to prevent unnecessary refetching
+  const { data: user, isLoading } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: async () => {
+      if (!token) return null;
+      const response = await apiRequest('GET', '/api/user/me');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      return data;
+    },
     enabled: !!token,
+    retry: false,
+    staleTime: 30000, // Add staleTime to prevent frequent refetches
+    cacheTime: 1000 * 60 * 5, // Cache for 5 minutes
+    onError: () => {
+      logout();
+    },
   });
 
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginCredentials) => {
       const response = await apiRequest('POST', '/api/auth/login', credentials);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Login failed');
+      }
       return await response.json();
     },
     onSuccess: (data) => {
-      setToken(data.token);
-      localStorage.setItem('token', data.token);
-      setIsAuthenticated(true);
-      refetch();
+      if (data.token) {
+        setToken(data.token);
+        localStorage.setItem('token', data.token);
+        setIsAuthenticated(true);
+      }
     },
   });
 
-  // Register mutation
+  // Register mutation updated to use refetch
   const registerMutation = useMutation({
     mutationFn: async (credentials: RegisterCredentials) => {
       const response = await apiRequest('POST', '/api/auth/register', credentials);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Registration failed');
+      }
       return await response.json();
     },
     onSuccess: (data) => {
-      setToken(data.token);
-      localStorage.setItem('token', data.token);
-      setIsAuthenticated(true);
-      refetch();
-    }
+      if (data.token) {
+        setToken(data.token);
+        localStorage.setItem('token', data.token);
+        setIsAuthenticated(true);
+        queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      }
+    },
   });
 
   // Set authorization header for all requests
@@ -72,19 +96,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [token]);
 
-  // Check authentication status on mount
+  // Remove the unnecessary refetch effect
   useEffect(() => {
-    if (token && !user && !isLoading) {
-      refetch();
+    if (token) {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     }
-  }, [token, user, isLoading, refetch]);
+  }, [token]);
 
-  // Logout function
+  // Logout function - modified to handle cleanup better
   const logout = () => {
     setToken(null);
     setIsAuthenticated(false);
     localStorage.removeItem('token');
-    queryClient.clear();
+    // Clear specific queries instead of all queries
+    queryClient.removeQueries({ queryKey: ['currentUser'] });
+    queryClient.removeQueries({ queryKey: ['skills'] });
+    queryClient.removeQueries({ queryKey: ['matches'] });
+    queryClient.removeQueries({ queryKey: ['sessions'] });
+    queryClient.removeQueries({ queryKey: ['stats'] });
   };
 
   // Login function
@@ -102,8 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: isLoading && !!token,
     user,
     token,
-    login,
-    register,
+    login: loginMutation.mutateAsync,
+    register: registerMutation.mutateAsync,
     logout
   };
 

@@ -19,11 +19,15 @@ export default function SkillsManagement() {
   const { toast } = useToast();
 
   const { data: teachingSkills, isLoading: isTeachingLoading } = useQuery({
-    queryKey: ['/api/user/skills/teaching'],
+    queryKey: ['user', 'skills', 'teaching'], // Changed from '/api/user/skills/teaching'
+    queryFn: () => apiRequest('GET', '/api/user/skills/teaching').then(res => res.json()),
+    staleTime: 1000 * 60 * 5,
   });
 
   const { data: learningSkills, isLoading: isLearningLoading } = useQuery({
-    queryKey: ['/api/user/skills/learning'],
+    queryKey: ['user', 'skills', 'learning'], // Changed from '/api/user/skills/learning'
+    queryFn: () => apiRequest('GET', '/api/user/skills/learning').then(res => res.json()),
+    staleTime: 1000 * 60 * 5,
   });
 
   const deleteSkillMutation = useMutation({
@@ -31,9 +35,8 @@ export default function SkillsManagement() {
       return await apiRequest('DELETE', `/api/user/skills/${skillId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user/skills/teaching'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/user/skills/learning'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/user/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['user', 'skills'] }); // This will invalidate all skills queries
+      queryClient.invalidateQueries({ queryKey: ['user', 'stats'] });
       toast({
         title: "Skill removed",
         description: "The skill has been removed from your profile.",

@@ -16,11 +16,33 @@ import SkillVerification from "@/components/dashboard/skill-verification";
 // Icons
 import { LayoutDashboard, LightbulbIcon, BookOpen, CalendarCheck2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Dashboard() {
+  // Use proper staleTime and cacheTime for each query
+  const { data: skills } = useQuery({
+    queryKey: ['skills'], // This matches what we want
+    queryFn: () => apiRequest('GET', '/api/skills').then(res => res.json()),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const { data: teachingSkills } = useQuery({
+    queryKey: ['user', 'skills', 'teaching'], // This is correct
+    queryFn: () => apiRequest('GET', '/api/user/skills/teaching').then(res => res.json()),
+    staleTime: 1000 * 60 * 5,
+  });
+
   // Fetch user stats
-  const { data: stats, isLoading: isLoadingStats } = useQuery({
+  interface UserStats {
+    matchesCount: number;
+    teachingCount: number;
+    learningCount: number;
+    sessionsCount: number;
+  }
+
+  const { data: stats, isLoading: isLoadingStats } = useQuery<UserStats>({
     queryKey: ['/api/user/stats'],
+    queryFn: () => apiRequest('GET', '/api/user/stats').then(res => res.json()),
   });
 
   return (

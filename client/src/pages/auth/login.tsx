@@ -39,16 +39,20 @@ export default function Login() {
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     setIsLoading(true);
     try {
-      await login(values);
-      navigate("/");
-      toast({
-        title: "Login successful",
-        description: "Welcome back to SkillSwap!",
-      });
+      const response = await login(values);
+      if (response?.token) {
+        navigate("/dashboard"); // Change from "/" to "/dashboard" for clarity
+        toast({
+          title: "Login successful",
+          description: "Welcome back to SkillSwap!",
+        });
+      } else {
+        throw new Error("Invalid response from server");
+      }
     } catch (error: any) {
       toast({
         title: "Login failed",
-        description: error.message || "Invalid email or password",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {

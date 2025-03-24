@@ -2,7 +2,8 @@ import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "./hooks/use-auth";
+import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { ProtectedRoute } from '@/components/protected-route';
 
 // Pages
 import Dashboard from "@/pages/dashboard";
@@ -14,25 +15,8 @@ import Messages from "@/pages/messages";
 import Sessions from "@/pages/sessions";
 import NotFound from "@/pages/not-found";
 
-// Route guard for protected routes
-const ProtectedRoute = ({ component: Component, ...rest }: { component: React.ComponentType<any>, [key: string]: any }) => {
-  const [location, setLocation] = useLocation();
-  const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-  
-  if (!isAuthenticated) {
-    setLocation('/login');
-    return null;
-  }
-  
-  return <Component {...rest} />;
-};
-
-const PublicRoute = ({ component: Component, ...rest }: { component: React.ComponentType<any>, [key: string]: any }) => {
-  const [location, setLocation] = useLocation();
+const PublicOnlyRoute = ({ component: Component, ...rest }: { component: React.ComponentType<any>, [key: string]: any }) => {
+  const [_, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
   
   if (isLoading) {
@@ -40,40 +24,62 @@ const PublicRoute = ({ component: Component, ...rest }: { component: React.Compo
   }
   
   if (isAuthenticated) {
-    setLocation('/');
+    setLocation('/dashboard');
     return null;
   }
   
   return <Component {...rest} />;
 };
 
-import { useAuth } from "./hooks/use-auth";
-
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const [location, setLocation] = useLocation();
-
-  // Global loading state
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  // Redirect to login if not authenticated and not on auth pages
-  if (!isAuthenticated && !location.startsWith('/login') && !location.startsWith('/register')) {
-    setLocation('/login');
-    return null;
-  }
-
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/matches" component={Matches} />
-      <Route path="/messages/:id?" component={Messages} />
-      <Route path="/sessions" component={Sessions} />
-      <Route component={NotFound} />
+      {/* Public routes */}
+      <Route path="/login">
+        <PublicOnlyRoute component={Login} />
+      </Route>
+      <Route path="/register">
+        <PublicOnlyRoute component={Register} />
+      </Route>
+
+      {/* Protected routes */}
+      <Route path="/dashboard">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/profile">
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/matches">
+        <ProtectedRoute>
+          <Matches />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/messages/:id?">
+        <ProtectedRoute>
+          <Messages />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/sessions">
+        <ProtectedRoute>
+          <Sessions />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Root redirect */}
+      <Route path="/">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
+
+      {/* 404 route */}
+      <Route>
+        <NotFound />
+      </Route>
     </Switch>
   );
 }
